@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "com.apisniff.app-merged_res-30:/layout_activity_main.xml.flat",
+        "source": "com.apisniff.app-main-32:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.apisniff.app-merged_res-30:/drawable_ic_launcher.xml.flat",
+        "source": "com.apisniff.app-main-32:/drawable/ic_launcher.xml"
+    },
+    {
+        "merged": "com.apisniff.app-merged_res-30:/layout_activity_detail.xml.flat",
+        "source": "com.apisniff.app-main-32:/layout/activity_detail.xml"
+    },
+    {
+        "merged": "com.apisniff.app-merged_res-30:/layout_item_request.xml.flat",
+        "source": "com.apisniff.app-main-32:/layout/item_request.xml"
+    }
+]

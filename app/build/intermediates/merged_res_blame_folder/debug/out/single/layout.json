@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.apisniff.app-mergeDebugResources-29:/layout/item_request.xml",
+        "source": "com.apisniff.app-main-32:/layout/item_request.xml"
+    },
+    {
+        "merged": "com.apisniff.app-mergeDebugResources-29:/layout/activity_main.xml",
+        "source": "com.apisniff.app-main-32:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.apisniff.app-mergeDebugResources-29:/layout/activity_detail.xml",
+        "source": "com.apisniff.app-main-32:/layout/activity_detail.xml"
+    }
+]
