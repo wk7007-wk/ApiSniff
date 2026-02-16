@@ -3,18 +3,24 @@
     window.__apiSniffIframeInjected = true;
 
     function notify(type, method, url, status, reqHeaders, reqBody, resBody) {
+        var rh = (reqHeaders || '').substring(0, 2000);
+        var rb = (reqBody || '').substring(0, 2000);
+        var rs = (resBody || '').substring(0, 5000);
+        // 직접 브릿지 시도 (같은 컨텍스트에 ApiSniff 있으면)
+        try {
+            if (typeof ApiSniff !== 'undefined') {
+                ApiSniff.onRequest(type, method, url, status, rh, rb, rs);
+                return;
+            }
+        } catch(e) {}
+        // 폴백: postMessage로 부모에 전달
         try {
             window.parent.postMessage({
-                __apiSniff: true,
-                type: type,
-                method: method,
-                url: url,
-                status: status,
-                reqHeaders: (reqHeaders || '').substring(0, 2000),
-                reqBody: (reqBody || '').substring(0, 2000),
-                resBody: (resBody || '').substring(0, 5000)
+                __apiSniff: true, type: type, method: method,
+                url: url, status: status,
+                reqHeaders: rh, reqBody: rb, resBody: rs
             }, '*');
-        } catch(e) {}
+        } catch(e2) {}
     }
 
     // fetch 패치

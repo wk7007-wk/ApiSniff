@@ -131,13 +131,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Cross-origin HTML 응답에 JS 인터셉터를 주입 (wujie iframe 등) */
+    /** 서브프레임(iframe/fetch) HTML 응답에 JS 인터셉터 주입 (wujie 등) */
     private fun tryInjectIntoHtml(url: String, request: WebResourceRequest): WebResourceResponse? {
-        val uri = Uri.parse(url)
-        val host = uri.host ?: return null
-        if (host == currentMainHost || currentMainHost.isEmpty()) return null
+        // 메인 프레임 네비게이션은 onPageFinished + evaluateJavascript로 처리
+        if (request.isForMainFrame) return null
         if (url.contains("/api/") || isNoiseUrl(url)) return null
-        val ext = (uri.path ?: "/").substringAfterLast('.', "").lowercase()
+        val ext = (Uri.parse(url).path ?: "/").substringAfterLast('.', "").lowercase()
         if (ext in listOf("js", "css", "json", "png", "jpg", "gif", "svg", "woff", "woff2", "ttf", "ico", "map", "webp")) return null
 
         try {
