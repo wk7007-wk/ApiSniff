@@ -2,6 +2,7 @@ package com.apisniff.app
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
@@ -79,6 +80,44 @@ class MainActivity : AppCompatActivity() {
                     super.onPageFinished(view, url)
                     binding.etUrl.setText(url)
                     if (isRecording) injectInterceptor()
+                }
+
+                // 네이티브 레벨 HTTP 인터셉터 — JS 컨텍스트 격리(wujie 등)와 무관하게 모든 요청 캡처
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                    if (!isRecording) return null
+                    val url = request.url.toString()
+                    val method = request.method ?: "GET"
+                    val headers = request.requestHeaders
+
+                    // 노이즈 필터링
+                    if (isNoiseUrl(url)) return null
+
+                    val headersStr = headers?.entries?.joinToString("\n") { "${it.key}: ${it.value}" } ?: ""
+
+                    val req = CapturedRequest(
+                        id = ++requestCounter,
+                        type = "native",
+                        method = method.uppercase(),
+                        url = url,
+                        status = 0,  // 네이티브 인터셉트에서는 응답 상태를 알 수 없음
+                        requestHeaders = headersStr.take(2000),
+                        requestBody = "",  // 네이티브 인터셉트에서는 요청 바디를 알 수 없음
+                        responseBody = ""  // 응답 바디도 알 수 없음 — JS 인터셉터가 보완
+                    )
+
+                    runOnUiThread {
+                        // JS 인터셉터가 같은 URL을 이미 잡았으면 중복 방지
+                        val isDuplicate = requests.any { it.url == url && it.type != "native" &&
+                            Math.abs(it.timestamp - req.timestamp) < 3000 }
+                        if (!isDuplicate) {
+                            requests.add(0, req)
+                            adapter.addItem(req)
+                            updateCount()
+                            binding.rvRequests.scrollToPosition(0)
+                        }
+                    }
+
+                    return null  // 요청을 수정하지 않고 그대로 통과
                 }
             }
             webChromeClient = WebChromeClient()
@@ -236,16 +275,38 @@ class MainActivity : AppCompatActivity() {
         binding.webView.evaluateJavascript(js, null)
     }
 
+    /** 노이즈 URL 필터링 — 텔레메트리, 봇 감지, 정적 리소스 제외 */
+    private fun isNoiseUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        // 정적 리소스
+        if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+            lower.endsWith(".gif") || lower.endsWith(".webp") || lower.endsWith(".ico") ||
+            lower.endsWith(".css") || lower.endsWith(".woff") || lower.endsWith(".woff2") ||
+            lower.endsWith(".ttf") || lower.endsWith(".svg") || lower.endsWith(".eot")) return true
+        // JS 파일 (라이브러리/번들)
+        if (lower.endsWith(".js") || lower.endsWith(".js.map")) return true
+        // 텔레메트리/로그/분석
+        if (lower.contains("jslog") || lower.contains("web-log") || lower.contains("/weblog/") ||
+            lower.contains("gtm") || lower.contains("analytics") || lower.contains("pixel") ||
+            lower.contains("favicon") || lower.contains("beacon") || lower.contains("telemetry") ||
+            lower.contains("logging") || lower.contains("tracker")) return true
+        // Akamai 봇 감지
+        if (lower.contains("sensor_data") || lower.contains("akamai")) return true
+        // 쿠팡 텔레메트리
+        if (lower.contains("ljc.coupang") || lower.contains("/weblog/submit")) return true
+        // 광고/추적
+        if (lower.contains("doubleclick") || lower.contains("googlesyndication") ||
+            lower.contains("google-analytics") || lower.contains("googletagmanager") ||
+            lower.contains("facebook.com/tr") || lower.contains("fbevents")) return true
+        return false
+    }
+
     inner class JsBridge {
         @JavascriptInterface
         fun onRequest(type: String, method: String, url: String, status: Int,
                       reqHeaders: String, reqBody: String, resBody: String) {
             if (!isRecording) return
-            // 텔레메트리/로그/이미지 등 노이즈 필터링
-            if (url.contains("jslog") || url.contains("web-log") || url.contains("gtm") ||
-                url.contains("analytics") || url.contains("pixel") || url.contains("favicon") ||
-                url.endsWith(".png") || url.endsWith(".jpg") || url.endsWith(".gif") ||
-                url.endsWith(".css") || url.endsWith(".woff") || url.endsWith(".svg")) return
+            if (isNoiseUrl(url)) return
 
             val req = CapturedRequest(
                 id = ++requestCounter,
@@ -259,8 +320,17 @@ class MainActivity : AppCompatActivity() {
             )
 
             runOnUiThread {
-                requests.add(0, req)
-                adapter.addItem(req)
+                // 네이티브 인터셉터가 같은 URL을 이미 잡았으면 그것을 업데이트 (응답 바디 등 보강)
+                val existing = requests.find { it.url == url && it.type == "native" &&
+                    Math.abs(it.timestamp - req.timestamp) < 3000 }
+                if (existing != null) {
+                    val idx = requests.indexOf(existing)
+                    requests[idx] = req.copy(id = existing.id)  // JS가 더 상세하므로 교체
+                    adapter.submitList(requests.toList())
+                } else {
+                    requests.add(0, req)
+                    adapter.addItem(req)
+                }
                 updateCount()
                 binding.rvRequests.scrollToPosition(0)
             }

@@ -58,10 +58,19 @@ class RequestListAdapter(
             tvTime.text = req.timeStr
             tvType.text = req.type
 
-            // XHR/fetch가 아닌 리소스 요청은 흐리게
-            val alpha = if (req.url.contains("/api/") || req.url.contains("json") ||
-                req.type == "fetch" || req.type == "xhr") 1f else 0.5f
+            // API 호출은 밝게, 기타는 흐리게
+            val isApiLike = req.url.contains("/api/") || req.url.contains("json") ||
+                req.method in listOf("POST", "PUT", "PATCH", "DELETE") ||
+                req.type == "fetch" || req.type == "xhr"
+            val alpha = if (isApiLike) 1f else 0.6f
             itemView.alpha = alpha
+
+            // native 타입은 배경색 구분
+            if (req.type == "native") {
+                tvType.setTextColor(0xFFFF9800.toInt())  // orange for native
+            } else {
+                tvType.setTextColor(0xFF888888.toInt())
+            }
 
             itemView.setOnClickListener { onClick(req) }
             itemView.setOnLongClickListener { onLongClick(req); true }
